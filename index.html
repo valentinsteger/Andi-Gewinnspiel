@@ -1,0 +1,322 @@
+
+<style>
+  #app { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #888; min-height: 520px; padding: 30px 20px; }
+  #wheel-container { position: relative; width: 400px; height: 400px; margin-top: 40px; }
+  #arrow-wrap { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); width: 32px; height: 36px; display: flex; align-items: flex-start; justify-content: center; z-index: 10; transform-origin: 50% 0%; }
+  #arrow-svg { display: block; }
+  canvas { border-radius: 50%; border: 4px solid #111; display: block; }
+  #spin-btn { margin-top: 28px; padding: 14px 48px; font-size: 20px; font-weight: 700; background: #e02020; color: #111; border: 3px solid #111; border-radius: 8px; cursor: pointer; letter-spacing: 1px; }
+  #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #fireworks { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 100; display: none; }
+</style>
+<div id="app">
+  <div id="wheel-container">
+    <div id="arrow-wrap">
+      <svg id="arrow-svg" width="32" height="32" viewBox="0 0 32 32">
+        <polygon points="16,30 2,2 30,2" fill="#111" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <canvas id="wheel" width="400" height="400"></canvas>
+  </div>
+  <button id="spin-btn">Drehen</button>
+</div>
+<canvas id="fireworks"></canvas>
+<script>
+const segments = [
+  "Gutschein 50€ für gemeinsamen Casinobesuch mit Flora und Valentin",
+  "Gutschein für 1x Friedhofsbesuch gemeinsam mit Oma",
+  "Meet and Greet mit DJ Ötzi",
+  "1 000 000 000 €",
+  "Spruchheft mit besseren Jass-Sprüchen als die von Opa",
+  "Leider kein Gewinn",
+  "Annette Bar Neueröffnung",
+  "Gutschein für 3x Valentin vor Gericht vertreten"
+];
+const colors = ["#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e67e22","#e91e8c"];
+const n = segments.length;
+const sliceAngle = (2 * Math.PI) / n;
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const W = 400, H = 400, R = 196, cx = W/2, cy = H/2;
+
+let currentAngle = -Math.PI / 2 - sliceAngle / 2;
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let lines = [], line = '';
+  for (let w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  const totalH = lines.length * lineHeight;
+  const startY = y - totalH / 2 + lineHeight / 2;
+  lines.forEach((l, i) => ctx.fillText(l, x, startY + i * lineHeight));
+}
+
+function drawWheel(angle) {
+  ctx.clearRect(0, 0, W, H);
+  for (let i = 0; i < n; i++) {
+    const start = angle + i * sliceAngle;
+    const end = start + sliceAngle;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, start, end);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.fill();
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + sliceAngle / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px sans-serif';
+    wrapText(ctx, segments[i], R * 0.6, 0, R * 0.75, 13);
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, 14, 0, 2 * Math.PI);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+drawWheel(currentAngle);
+
+// Arrow bump logic
+const arrowWrap = document.getElementById('arrow-wrap');
+let arrowRotation = 0;
+let arrowVel = 0;
+let lastAngle = currentAngle;
+let arrowAnimId = null;
+
+function getSegmentBoundaries(angle) {
+  // returns array of boundary angles (normalized 0..2PI)
+  let bounds = [];
+  for (let i = 0; i < n; i++) {
+    bounds.push(((angle + i * sliceAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
+  }
+  return bounds;
+}
+
+function normalizeAngle(a) {
+  return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+}
+
+// Track last boundary crossing
+let lastNormAngle = normalizeAngle(currentAngle);
+let lastBoundaryIndex = -1;
+
+function checkBumps(prevAngle, newAngle) {
+  const delta = newAngle - prevAngle;
+  if (Math.abs(delta) < 0.0001) return;
+  for (let i = 0; i < n; i++) {
+    const boundaryAngle = normalizeAngle(newAngle + i * sliceAngle);
+    // Check if the top (angle = -PI/2 = 3PI/2 normalized) was just crossed
+    const topTarget = 3 * Math.PI / 2;
+    const topPrev = normalizeAngle(prevAngle + i * sliceAngle);
+    const topCurr = normalizeAngle(newAngle + i * sliceAngle);
+    // Clockwise crossing: prev < topTarget < curr (in circular sense)
+    let crossed = false;
+    if (delta > 0) {
+      if (topPrev < topTarget && topCurr >= topTarget) crossed = true;
+      if (topPrev > topCurr) { // wrapped
+        if (topPrev < topTarget || topCurr >= topTarget) crossed = true;
+      }
+    }
+    if (crossed) {
+      arrowVel = -0.35;
+    }
+  }
+}
+
+function arrowPhysics() {
+  const spring = 0.18, damping = 0.72;
+  arrowVel += -spring * arrowRotation;
+  arrowVel *= damping;
+  arrowRotation += arrowVel;
+  arrowWrap.style.transform = `translateX(-50%) rotate(${arrowRotation}rad)`;
+  arrowWrap.style.transformOrigin = '50% 0%';
+  arrowAnimId = requestAnimationFrame(arrowPhysics);
+}
+arrowAnimId = requestAnimationFrame(arrowPhysics);
+
+const btn = document.getElementById('spin-btn');
+function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
+
+btn.addEventListener('click', () => {
+  btn.disabled = true;
+
+  // WIN: segment 0 must be under the arrow (pointing straight down = -PI/2)
+  // Arrow points to top = angle offset = -PI/2
+  // Segment 0 center is at currentAngle + 0*sliceAngle + sliceAngle/2
+  // We want: currentAngle + sliceAngle/2 = -PI/2 (mod 2PI)
+  // So: targetAngle = -PI/2 - sliceAngle/2 (mod 2PI)
+
+  const winAngle = -Math.PI / 2 - sliceAngle / 2;
+  const extraSpins = 2 * Math.PI * (7 + Math.floor(Math.random() * 3));
+  // Calculate how much to rotate forward to land on winAngle
+  const delta = ((winAngle - currentAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  const totalForward = extraSpins + delta;
+
+  const phase1Duration = 2000;
+  const phase1Delta = -(20 * Math.PI / 180);
+  let phase1Start = null;
+  const startAngle = currentAngle;
+
+  function phase1(ts) {
+    if (!phase1Start) phase1Start = ts;
+    const t = Math.min((ts - phase1Start) / phase1Duration, 1);
+    const eased = Math.sin(t * Math.PI / 2);
+    const newAngle = startAngle + phase1Delta * eased;
+    checkBumps(currentAngle, newAngle);
+    currentAngle = newAngle;
+    drawWheel(currentAngle);
+    if (t < 1) requestAnimationFrame(phase1);
+    else requestAnimationFrame(phase2);
+  }
+
+  const phase2Duration = 10000;
+  let phase2Start = null;
+  let phase2StartAngle;
+  let phase2EndAngle;
+
+  function phase2(ts) {
+    if (!phase2Start) {
+      phase2Start = ts;
+      phase2StartAngle = currentAngle;
+      phase2EndAngle = phase2StartAngle + totalForward;
+    }
+    const t = Math.min((ts - phase2Start) / phase2Duration, 1);
+    const eased = easeOut(t);
+    const newAngle = phase2StartAngle + (phase2EndAngle - phase2StartAngle) * eased;
+    checkBumps(currentAngle, newAngle);
+    currentAngle = newAngle;
+    drawWheel(currentAngle);
+    if (t < 1) requestAnimationFrame(phase2);
+    else {
+      currentAngle = phase2EndAngle;
+      drawWheel(currentAngle);
+      setTimeout(launchFireworks, 400);
+      setTimeout(() => { btn.disabled = false; }, 6000);
+    }
+  }
+
+  requestAnimationFrame(phase1);
+});
+
+// === FIREWORKS ===
+const fwCanvas = document.getElementById('fireworks');
+const fwCtx = fwCanvas.getContext('2d');
+let particles = [];
+let fwAnim = null;
+
+function spawnBurst(x, y, hue, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * 2 * Math.PI + Math.random() * 0.3;
+    const speed = 3 + Math.random() * 6;
+    const size = 2 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      alpha: 1,
+      size,
+      color: `hsl(${hue + Math.random()*40 - 20},100%,60%)`,
+      trail: []
+    });
+  }
+}
+
+function spawnRocket(targetX, targetY, hue) {
+  return new Promise(resolve => {
+    const startX = targetX + (Math.random() - 0.5) * 100;
+    const startY = fwCanvas.height;
+    const duration = 600 + Math.random() * 400;
+    const start = performance.now();
+    function rise(ts) {
+      const t = Math.min((ts - start) / duration, 1);
+      const cx = startX + (targetX - startX) * t;
+      const cy = startY + (targetY - startY) * t;
+      fwCtx.beginPath();
+      fwCtx.arc(cx, cy, 3, 0, 2 * Math.PI);
+      fwCtx.fillStyle = `hsl(${hue},100%,80%)`;
+      fwCtx.globalAlpha = 1;
+      fwCtx.fill();
+      fwCtx.globalAlpha = 1;
+      if (t < 1) requestAnimationFrame(rise);
+      else { spawnBurst(targetX, targetY, hue, 55); resolve(); }
+    }
+    requestAnimationFrame(rise);
+  });
+}
+
+function launchFireworks() {
+  fwCanvas.style.display = 'block';
+  fwCanvas.width = window.innerWidth;
+  fwCanvas.height = window.innerHeight;
+  particles = [];
+
+  const hues = [0, 40, 60, 120, 200, 270, 300, 180];
+  let launched = 0;
+
+  async function wave() {
+    const count = 3 + Math.floor(Math.random() * 3);
+    const promises = [];
+    for (let i = 0; i < count; i++) {
+      const x = fwCanvas.width * (0.15 + Math.random() * 0.7);
+      const y = fwCanvas.height * (0.08 + Math.random() * 0.45);
+      const hue = hues[Math.floor(Math.random() * hues.length)];
+      promises.push(spawnRocket(x, y, hue));
+    }
+    await Promise.all(promises);
+    launched++;
+    if (launched < 5) setTimeout(wave, 300);
+    else {
+      setTimeout(() => {
+        fwCanvas.style.display = 'none';
+        particles = [];
+      }, 2500);
+    }
+  }
+
+  wave();
+
+  if (fwAnim) cancelAnimationFrame(fwAnim);
+  function animateFW(ts) {
+    fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+    particles = particles.filter(p => p.alpha > 0.02);
+    particles.forEach(p => {
+      p.trail.push({x: p.x, y: p.y, alpha: p.alpha});
+      if (p.trail.length > 8) p.trail.shift();
+      p.trail.forEach((pt, i) => {
+        fwCtx.beginPath();
+        fwCtx.arc(pt.x, pt.y, p.size * (i / p.trail.length), 0, 2 * Math.PI);
+        fwCtx.fillStyle = p.color;
+        fwCtx.globalAlpha = pt.alpha * (i / p.trail.length) * 0.5;
+        fwCtx.fill();
+      });
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.12;
+      p.vx *= 0.98;
+      p.alpha -= 0.013;
+      fwCtx.beginPath();
+      fwCtx.arc(p.x, p.y, p.size, 0, 2 * Math.PI);
+      fwCtx.fillStyle = p.color;
+      fwCtx.globalAlpha = Math.max(p.alpha, 0);
+      fwCtx.fill();
+      fwCtx.globalAlpha = 1;
+    });
+    fwAnim = requestAnimationFrame(animateFW);
+  }
+  fwAnim = requestAnimationFrame(animateFW);
+}
+</script>
