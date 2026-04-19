@@ -282,6 +282,7 @@ function launchFireworks() {
     else {
       setTimeout(() => {
         fwCanvas.style.display = 'none';
+        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
         particles = [];
       }, 2500);
     }
