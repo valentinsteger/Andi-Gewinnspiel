@@ -239,6 +239,33 @@ function relaxedJoints(sceneH) {
   };
 }
 
+// Dance pose — arms up and wiggling, body bouncing
+function danceJoints(sceneH, t) {
+  const groundY = sceneH - 10;
+  const bob = Math.abs(Math.sin(t * Math.PI * 4)) * 8;
+  const hipY = groundY - UPPER_LEG - LOWER_LEG + 18 - bob;
+  const shoulderY = hipY - BODY_LEN * 0.72;
+  const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
+
+  const wave = Math.sin(t * Math.PI * 4);
+  const rArmAngle = -0.9 + wave * 0.4;
+  const lArmAngle = -0.9 - wave * 0.4;
+
+  const rEx = Math.sin(rArmAngle)*ARM_LEN, rEy = shoulderY + Math.cos(rArmAngle)*ARM_LEN;
+  const lEx = Math.sin(lArmAngle)*ARM_LEN, lEy = shoulderY + Math.cos(lArmAngle)*ARM_LEN;
+  const rHx = rEx + Math.sin(rArmAngle-0.3)*FOREARM_LEN, rHy = rEy + Math.cos(rArmAngle-0.3)*FOREARM_LEN;
+  const lHx = lEx + Math.sin(lArmAngle+0.3)*FOREARM_LEN, lHy = lEy + Math.cos(lArmAngle+0.3)*FOREARM_LEN;
+
+  const legBob = Math.sin(t * Math.PI * 4) * 0.25;
+  return {
+    headY, shoulderY, hipY,
+    rightElbow: {x: rEx, y: rEy}, rightHand: {x: rHx, y: rHy},
+    leftElbow:  {x: lEx, y: lEy}, leftHand:  {x: lHx, y: lHy},
+    rightKnee: {x: 14 + legBob*10, y: hipY + UPPER_LEG*0.9}, rightFoot: {x: 18, y: groundY},
+    leftKnee:  {x:-14 - legBob*10, y: hipY + UPPER_LEG*0.9}, leftFoot:  {x:-18, y: groundY}
+  };
+}
+
 // ---- ANIMATION STATE ----
 let animState = 'idle';
 let figX = 0, figFacing = -1, walkCycle = 0, targetX = 0;
@@ -319,6 +346,11 @@ function animLoop(ts) {
     const sceneHY = wi.cy;
     const loc = rimToLocal(sceneHX, sceneHY, figX, figFacing);
     drawStick(figX, figFacing, standJoints(scene.height, loc.lx, loc.ly));
+
+  } else if (animState === 'dancing') {
+    walkCycle += dt * 1.0;
+    figFacing = -1;
+    drawStick(figX, figFacing, danceJoints(scene.height, walkCycle));
 
   } else if (animState === 'walking-out') {
     figFacing = 1;
@@ -418,8 +450,9 @@ btn.addEventListener('click', () => {
         animState = 'touch-before-turn';
         const winner = getWinningSegment(currentAngle);
         setTimeout(() => { launchFireworks(); resultBox.textContent = '🎉 Gewonnen: ' + winner; resultBox.style.display = 'block'; }, 400);
-        setTimeout(() => { animState = 'walking-out'; walkCycle = 0; }, 700);
-        setTimeout(() => { btn.disabled = false; }, 6000);
+        setTimeout(() => { animState = 'dancing'; walkCycle = 0; }, 700);
+        setTimeout(() => { animState = 'walking-out'; walkCycle = 0; }, 6500);
+        setTimeout(() => { btn.disabled = false; }, 8000);
       }
     }
 
