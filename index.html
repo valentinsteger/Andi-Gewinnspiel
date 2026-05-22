@@ -10,7 +10,7 @@
   #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   #result-box { margin-top: 20px; color: #fff; font-size: 17px; font-weight: 700; text-align: center; max-width: 380px; display: none; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   #fireworks { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; display: none; }
-  #stick-scene { position: fixed; bottom: 0; left: 0; width: 100vw; height: 260px; pointer-events: none; z-index: 100; overflow: hidden; display: none; }
+  #stick-scene { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 100; overflow: hidden; display: none; }
 </style>
 
 <div id="app">
@@ -154,7 +154,7 @@ function drawStick(x, facing, j) {
 
 function walkJoints(t, sceneH) {
   const bob = Math.abs(Math.sin(t * Math.PI)) * 4;
-  const groundY = sceneH - 10;
+  const groundY = getGroundY();
   const hipY = groundY - UPPER_LEG - LOWER_LEG + 18 - bob;
   const shoulderY = hipY - BODY_LEN * 0.72;
   const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
@@ -205,7 +205,7 @@ function solveArm(tx, ty, shoulderY) {
 }
 
 function standJoints(sceneH, localHandX, localHandY) {
-  const groundY = sceneH - 10;
+  const groundY = getGroundY();
   const hipY = groundY - UPPER_LEG - LOWER_LEG + 18;
   const shoulderY = hipY - BODY_LEN * 0.72;
   const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
@@ -224,7 +224,7 @@ function standJoints(sceneH, localHandX, localHandY) {
 
 // Relaxed arm pose (hand hangs down, not touching wheel)
 function relaxedJoints(sceneH) {
-  const groundY = sceneH - 10;
+  const groundY = getGroundY();
   const hipY = groundY - UPPER_LEG - LOWER_LEG + 18;
   const shoulderY = hipY - BODY_LEN * 0.72;
   const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
@@ -241,7 +241,7 @@ function relaxedJoints(sceneH) {
 
 // Dance pose — arms up and wiggling, body bouncing
 function danceJoints(sceneH, t) {
-  const groundY = sceneH - 10;
+  const groundY = getGroundY();
   const bob = Math.abs(Math.sin(t * Math.PI * 4)) * 8;
   const hipY = groundY - UPPER_LEG - LOWER_LEG + 18 - bob;
   const shoulderY = hipY - BODY_LEN * 0.72;
@@ -278,7 +278,7 @@ const RELEASE_SPEED = 1.2; // rad/s — slow initial push: touch; fast spin: rel
 
 let animRAF = null, prevTS = null;
 
-function resizeScene() { scene.width = window.innerWidth; scene.height = 260; }
+function resizeScene() { scene.width = window.innerWidth; scene.height = window.innerHeight; }
 
 function getWheelInfo() {
   const rect = wheelCanvas.getBoundingClientRect();
@@ -299,6 +299,12 @@ function getStopX(wInfo) {
   // localHandX ≈ ARM_LEN + FOREARM_LEN (fully stretched)
   // Add a small gap so IK doesn't fully lock out
   return wInfo.cx + wInfo.r + ARM_LEN + FOREARM_LEN - 82;
+}
+
+function getGroundY() {
+  // Align figure's feet to the bottom of the wheel
+  const wi = getWheelInfo();
+  return wi.cy + wi.r;
 }
 
 function clearScene() { sctx.clearRect(0, 0, scene.width, scene.height); }
