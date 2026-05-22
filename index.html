@@ -1,45 +1,54 @@
-
 <style>
-  #app { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #888; min-height: 520px; padding: 30px 20px; }
-  #wheel-container { position: relative; width: 400px; height: 400px; margin-top: 40px; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #888; min-height: 100%; }
+  #app { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #888; min-height: 100vh; padding: 30px 20px 40px; position: relative; z-index: 1; }
+  #welcome-text { color: #fff; font-size: 16px; font-weight: 500; text-align: center; max-width: 360px; margin-bottom: 10px; line-height: 1.5; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+  #wheel-container { position: relative; width: 400px; height: 400px; margin-top: 20px; }
   #arrow-wrap { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); width: 32px; height: 36px; display: flex; align-items: flex-start; justify-content: center; z-index: 10; transform-origin: 50% 0%; }
-  #arrow-svg { display: block; }
-  canvas { border-radius: 50%; border: 4px solid #111; display: block; }
+  canvas#wheel { border-radius: 50%; border: 4px solid #111; display: block; }
   #spin-btn { margin-top: 28px; padding: 14px 48px; font-size: 20px; font-weight: 700; background: #e02020; color: #111; border: 3px solid #111; border-radius: 8px; cursor: pointer; letter-spacing: 1px; }
   #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  #fireworks { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 100; display: none; }
+  #result-box { margin-top: 20px; color: #fff; font-size: 17px; font-weight: 700; text-align: center; max-width: 380px; display: none; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  #fireworks { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; display: none; }
+  #stick-scene { position: fixed; bottom: 0; left: 0; width: 100vw; height: 260px; pointer-events: none; z-index: 100; overflow: hidden; display: none; }
 </style>
+
 <div id="app">
+  <p id="welcome-text">Willkommen zu deinem Geburtstagsglücksrad! Dreh wenn du bereit bist und erhalte deinen Gewinn :)</p>
   <div id="wheel-container">
     <div id="arrow-wrap">
-      <svg id="arrow-svg" width="32" height="32" viewBox="0 0 32 32">
+      <svg width="32" height="32" viewBox="0 0 32 32">
         <polygon points="16,30 2,2 30,2" fill="#111" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/>
       </svg>
     </div>
     <canvas id="wheel" width="400" height="400"></canvas>
   </div>
   <button id="spin-btn">Drehen</button>
+  <div id="result-box"></div>
 </div>
+
 <canvas id="fireworks"></canvas>
+<canvas id="stick-scene"></canvas>
+
 <script>
 const segments = [
-  "Gutschein 50€ für gemeinsamen Casinobesuch mit Flora und Valentin",
-  "Gutschein für 1x Friedhofsbesuch gemeinsam mit Oma",
+  "Gemeinsamer Casinobesuch mit Flora und Valentin",
+  "Gutschein für 1x Friedhofsbesuch mit Oma",
   "Meet and Greet mit DJ Ötzi",
   "1 000 000 000 €",
   "Spruchheft mit besseren Jass-Sprüchen als die von Opa",
   "Leider kein Gewinn",
-  "Annette Bar Neueröffnung",
+  "Anette Bar Neueröffnung",
   "Gutschein für 3x Valentin vor Gericht vertreten"
 ];
 const colors = ["#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e67e22","#e91e8c"];
 const n = segments.length;
 const sliceAngle = (2 * Math.PI) / n;
-const canvas = document.getElementById('wheel');
-const ctx = canvas.getContext('2d');
+const wheelCanvas = document.getElementById('wheel');
+const wctx = wheelCanvas.getContext('2d');
 const W = 400, H = 400, R = 196, cx = W/2, cy = H/2;
-
-let currentAngle = -Math.PI / 2 - sliceAngle / 2;
+const currentAngleInit = -Math.PI / 2 - 3 * sliceAngle - sliceAngle / 2;
+let currentAngle = currentAngleInit;
 
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split(' ');
@@ -56,268 +65,378 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 function drawWheel(angle) {
-  ctx.clearRect(0, 0, W, H);
+  wctx.clearRect(0, 0, W, H);
   for (let i = 0; i < n; i++) {
-    const start = angle + i * sliceAngle;
-    const end = start + sliceAngle;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, R, start, end);
-    ctx.closePath();
-    ctx.fillStyle = colors[i];
-    ctx.fill();
-    ctx.strokeStyle = '#111';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(start + sliceAngle / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.font = '11px sans-serif';
-    wrapText(ctx, segments[i], R * 0.6, 0, R * 0.75, 13);
-    ctx.restore();
+    const start = angle + i * sliceAngle, end = start + sliceAngle;
+    wctx.beginPath(); wctx.moveTo(cx, cy); wctx.arc(cx, cy, R, start, end); wctx.closePath();
+    wctx.fillStyle = colors[i]; wctx.fill();
+    wctx.strokeStyle = '#111'; wctx.lineWidth = 2; wctx.stroke();
+    wctx.save(); wctx.translate(cx, cy); wctx.rotate(start + sliceAngle / 2);
+    wctx.textAlign = 'center'; wctx.textBaseline = 'middle';
+    wctx.fillStyle = '#fff'; wctx.font = '11px sans-serif';
+    wrapText(wctx, segments[i], R * 0.6, 0, R * 0.75, 13);
+    wctx.restore();
   }
-  ctx.beginPath();
-  ctx.arc(cx, cy, 14, 0, 2 * Math.PI);
-  ctx.fillStyle = '#fff';
-  ctx.fill();
-  ctx.strokeStyle = '#111';
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  wctx.beginPath(); wctx.arc(cx, cy, 14, 0, 2 * Math.PI);
+  wctx.fillStyle = '#fff'; wctx.fill();
+  wctx.strokeStyle = '#111'; wctx.lineWidth = 3; wctx.stroke();
 }
-
 drawWheel(currentAngle);
 
-// Arrow bump logic
 const arrowWrap = document.getElementById('arrow-wrap');
-let arrowRotation = 0;
-let arrowVel = 0;
-let lastAngle = currentAngle;
-let arrowAnimId = null;
+let arrowRotation = 0, arrowVel = 0;
+(function arrowPhysics() {
+  arrowVel += -0.18 * arrowRotation; arrowVel *= 0.72; arrowRotation += arrowVel;
+  arrowWrap.style.transform = `translateX(-50%) rotate(${arrowRotation}rad)`;
+  requestAnimationFrame(arrowPhysics);
+})();
 
-function getSegmentBoundaries(angle) {
-  // returns array of boundary angles (normalized 0..2PI)
-  let bounds = [];
-  for (let i = 0; i < n; i++) {
-    bounds.push(((angle + i * sliceAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI));
-  }
-  return bounds;
+function getWinningSegment(finalAngle) {
+  const normalized = ((-Math.PI/2 - finalAngle) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+  return segments[Math.floor(normalized / sliceAngle) % n];
 }
-
-function normalizeAngle(a) {
-  return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-}
-
-// Track last boundary crossing
-let lastNormAngle = normalizeAngle(currentAngle);
-let lastBoundaryIndex = -1;
 
 function checkBumps(prevAngle, newAngle) {
   const delta = newAngle - prevAngle;
   if (Math.abs(delta) < 0.0001) return;
   for (let i = 0; i < n; i++) {
-    const boundaryAngle = normalizeAngle(newAngle + i * sliceAngle);
-    // Check if the top (angle = -PI/2 = 3PI/2 normalized) was just crossed
     const topTarget = 3 * Math.PI / 2;
-    const topPrev = normalizeAngle(prevAngle + i * sliceAngle);
-    const topCurr = normalizeAngle(newAngle + i * sliceAngle);
-    // Clockwise crossing: prev < topTarget < curr (in circular sense)
+    const topPrev = ((prevAngle + i * sliceAngle) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+    const topCurr = ((newAngle + i * sliceAngle) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
     let crossed = false;
     if (delta > 0) {
       if (topPrev < topTarget && topCurr >= topTarget) crossed = true;
-      if (topPrev > topCurr) { // wrapped
-        if (topPrev < topTarget || topCurr >= topTarget) crossed = true;
-      }
+      if (topPrev > topCurr && (topPrev < topTarget || topCurr >= topTarget)) crossed = true;
     }
-    if (crossed) {
-      arrowVel = -0.35;
-    }
+    if (crossed) arrowVel = -0.35;
   }
 }
 
-function arrowPhysics() {
-  const spring = 0.18, damping = 0.72;
-  arrowVel += -spring * arrowRotation;
-  arrowVel *= damping;
-  arrowRotation += arrowVel;
-  arrowWrap.style.transform = `translateX(-50%) rotate(${arrowRotation}rad)`;
-  arrowWrap.style.transformOrigin = '50% 0%';
-  arrowAnimId = requestAnimationFrame(arrowPhysics);
-}
-arrowAnimId = requestAnimationFrame(arrowPhysics);
+// ---- STICK FIGURE ----
+const scene = document.getElementById('stick-scene');
+const sctx = scene.getContext('2d');
 
+const HEAD_R = 22, BODY_LEN = 70, ARM_LEN = 48, FOREARM_LEN = 40, UPPER_LEG = 55, LOWER_LEG = 50, LW = 4;
+
+const headImg = new Image();
+headImg.src = 'https://raw.githubusercontent.com/valentinsteger/Andi-Gewinnspiel/main/Andi%20gesicht.png';
+
+function drawStick(x, facing, j) {
+  sctx.save();
+  sctx.translate(x, 0);
+  sctx.scale(facing, 1);
+  sctx.strokeStyle = '#111';
+  sctx.lineWidth = LW;
+  sctx.lineCap = 'round';
+  sctx.lineJoin = 'round';
+
+  if (headImg.complete && headImg.naturalWidth > 0) {
+    // Temporarily undo the facing scale so the face image is never mirrored
+    sctx.save();
+    sctx.scale(facing, 1); // cancel out the outer scale(facing,1)
+    sctx.drawImage(headImg, -HEAD_R, j.headY - HEAD_R, HEAD_R * 2, HEAD_R * 2);
+    sctx.restore();
+  } else {
+    sctx.beginPath(); sctx.arc(0, j.headY, HEAD_R, 0, Math.PI*2);
+    sctx.fillStyle = '#fff'; sctx.fill(); sctx.stroke();
+  }
+
+  sctx.beginPath(); sctx.moveTo(0, j.headY + HEAD_R); sctx.lineTo(0, j.hipY); sctx.stroke();
+
+  sctx.beginPath(); sctx.moveTo(0, j.shoulderY); sctx.lineTo(j.leftElbow.x, j.leftElbow.y); sctx.lineTo(j.leftHand.x, j.leftHand.y); sctx.stroke();
+  sctx.beginPath(); sctx.moveTo(0, j.shoulderY); sctx.lineTo(j.rightElbow.x, j.rightElbow.y); sctx.lineTo(j.rightHand.x, j.rightHand.y); sctx.stroke();
+
+  sctx.beginPath(); sctx.moveTo(0, j.hipY); sctx.lineTo(j.leftKnee.x, j.leftKnee.y); sctx.lineTo(j.leftFoot.x, j.leftFoot.y); sctx.stroke();
+  sctx.beginPath(); sctx.moveTo(0, j.hipY); sctx.lineTo(j.rightKnee.x, j.rightKnee.y); sctx.lineTo(j.rightFoot.x, j.rightFoot.y); sctx.stroke();
+
+  sctx.restore();
+}
+
+function walkJoints(t, sceneH) {
+  const bob = Math.abs(Math.sin(t * Math.PI)) * 4;
+  const groundY = sceneH - 10;
+  const hipY = groundY - UPPER_LEG - LOWER_LEG + 18 - bob;
+  const shoulderY = hipY - BODY_LEN * 0.72;
+  const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
+
+  const legAngle = Math.sin(t * Math.PI * 2) * 0.55;
+  const rThigh = legAngle, lThigh = -legAngle;
+  const rKneeBend = Math.max(0, -Math.sin(t * Math.PI * 2)) * 0.6;
+  const lKneeBend = Math.max(0, Math.sin(t * Math.PI * 2)) * 0.6;
+
+  function legKnee(th, hip) { return { x: Math.sin(th)*UPPER_LEG, y: hip + Math.cos(th)*UPPER_LEG }; }
+  function legFoot(th, kb, hip) {
+    const kx = Math.sin(th)*UPPER_LEG, ky = Math.cos(th)*UPPER_LEG;
+    const la = th + kb;
+    return { x: kx + Math.sin(la)*LOWER_LEG, y: hip + ky + Math.cos(la)*LOWER_LEG };
+  }
+
+  const armSwing = Math.sin(t * Math.PI * 2) * 0.5;
+  function armJoints(angle, sy) {
+    const ex = Math.sin(angle)*ARM_LEN, ey = sy + Math.cos(angle)*ARM_LEN;
+    const fa = angle + 0.2;
+    return { elbow: {x:ex,y:ey}, hand: {x: ex+Math.sin(fa)*FOREARM_LEN, y: ey+Math.cos(fa)*FOREARM_LEN} };
+  }
+  const rArm = armJoints(-armSwing, shoulderY);
+  const lArm = armJoints(armSwing, shoulderY);
+
+  return {
+    headY, shoulderY, hipY,
+    rightElbow: rArm.elbow, rightHand: rArm.hand,
+    leftElbow: lArm.elbow, leftHand: lArm.hand,
+    rightKnee: legKnee(rThigh, hipY), rightFoot: legFoot(rThigh, rKneeBend, hipY),
+    leftKnee: legKnee(lThigh, hipY), leftFoot: legFoot(lThigh, lKneeBend, hipY)
+  };
+}
+
+// IK: given target hand position in local coords, compute elbow + hand
+function solveArm(tx, ty, shoulderY) {
+  const dy = ty - shoulderY;
+  const dist = Math.sqrt(tx*tx + dy*dy);
+  const clamped = Math.min(dist, ARM_LEN + FOREARM_LEN - 2);
+  const baseAngle = Math.atan2(tx, dy);
+  const cosE = (ARM_LEN*ARM_LEN + clamped*clamped - FOREARM_LEN*FOREARM_LEN) / (2*ARM_LEN*clamped);
+  const elbowOff = Math.acos(Math.max(-1, Math.min(1, cosE)));
+  const elbowAngle = baseAngle - elbowOff;
+  return {
+    elbow: { x: Math.sin(elbowAngle)*ARM_LEN, y: shoulderY + Math.cos(elbowAngle)*ARM_LEN },
+    hand:  { x: tx, y: ty }
+  };
+}
+
+function standJoints(sceneH, localHandX, localHandY) {
+  const groundY = sceneH - 10;
+  const hipY = groundY - UPPER_LEG - LOWER_LEG + 18;
+  const shoulderY = hipY - BODY_LEN * 0.72;
+  const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
+
+  const arm = solveArm(localHandX, localHandY, shoulderY);
+
+  return {
+    headY, shoulderY, hipY,
+    rightElbow: arm.elbow, rightHand: arm.hand,
+    leftElbow: { x: -ARM_LEN*0.7, y: shoulderY + ARM_LEN*0.7 },
+    leftHand:  { x: -ARM_LEN*0.5, y: shoulderY + ARM_LEN*1.1 },
+    rightKnee: { x: 14, y: hipY + UPPER_LEG*0.9 }, rightFoot: { x: 18, y: groundY },
+    leftKnee:  { x:-14, y: hipY + UPPER_LEG*0.9 }, leftFoot:  { x:-18, y: groundY }
+  };
+}
+
+// Relaxed arm pose (hand hangs down, not touching wheel)
+function relaxedJoints(sceneH) {
+  const groundY = sceneH - 10;
+  const hipY = groundY - UPPER_LEG - LOWER_LEG + 18;
+  const shoulderY = hipY - BODY_LEN * 0.72;
+  const headY = shoulderY - BODY_LEN * 0.28 - HEAD_R;
+  return {
+    headY, shoulderY, hipY,
+    rightElbow: { x: ARM_LEN*0.6,  y: shoulderY + ARM_LEN*0.8 },
+    rightHand:  { x: ARM_LEN*0.4,  y: shoulderY + ARM_LEN*1.4 },
+    leftElbow:  { x:-ARM_LEN*0.7,  y: shoulderY + ARM_LEN*0.7 },
+    leftHand:   { x:-ARM_LEN*0.5,  y: shoulderY + ARM_LEN*1.1 },
+    rightKnee: { x: 14, y: hipY + UPPER_LEG*0.9 }, rightFoot: { x: 18, y: groundY },
+    leftKnee:  { x:-14, y: hipY + UPPER_LEG*0.9 }, leftFoot:  { x:-18, y: groundY }
+  };
+}
+
+// ---- ANIMATION STATE ----
+let animState = 'idle';
+let figX = 0, figFacing = -1, walkCycle = 0, targetX = 0;
+// Current wheel angular position — shared between wheel draw and figure
+let spinHandAngle = 0;
+// How fast the wheel is spinning right now (rad/s) — written by wheel phases
+let currentWheelVel = 0;
+// Threshold: above this speed the figure lets go
+const RELEASE_SPEED = 1.2; // rad/s — slow initial push: touch; fast spin: release
+
+let animRAF = null, prevTS = null;
+
+function resizeScene() { scene.width = window.innerWidth; scene.height = 260; }
+
+function getWheelInfo() {
+  const rect = wheelCanvas.getBoundingClientRect();
+  const sr   = scene.getBoundingClientRect();
+  return {
+    cx: rect.left + rect.width/2  - sr.left,
+    cy: rect.top  + rect.height/2 - sr.top,
+    r:  rect.width / 2
+  };
+}
+
+function getStopX(wInfo) {
+  // Figure stands to the right of wheel, facing left (facing = -1).
+  // In local coords (after scale(-1,1)), positive x goes LEFT in screen.
+  // The right arm extends in +local-x direction → screen -x direction.
+  // Hand scene x = figX - localHandX
+  // We want hand to reach wheel right edge: figX - localHandX = wInfo.cx + wInfo.r
+  // localHandX ≈ ARM_LEN + FOREARM_LEN (fully stretched)
+  // Add a small gap so IK doesn't fully lock out
+  return wInfo.cx + wInfo.r + ARM_LEN + FOREARM_LEN - 82;
+}
+
+function clearScene() { sctx.clearRect(0, 0, scene.width, scene.height); }
+
+// Convert wheel-rim point (scene coords) → figure local coords
+function rimToLocal(sceneHX, sceneHY, figXpos, facing) {
+  return {
+    lx: (sceneHX - figXpos) / facing,
+    ly: sceneHY
+  };
+}
+
+function animLoop(ts) {
+  if (!prevTS) prevTS = ts;
+  const dt = Math.min((ts - prevTS) / 1000, 0.05);
+  prevTS = ts;
+  clearScene();
+
+  if (animState === 'walking-in') {
+    figX -= 130 * dt; // slower walk
+    walkCycle += dt * 1.4;
+    if (figX <= targetX) { figX = targetX; animState = 'at-wheel'; spinHandAngle = Math.PI * 0.1; }
+    drawStick(figX, figFacing, walkJoints(walkCycle, scene.height));
+
+  } else if (animState === 'at-wheel') {
+    // standing, arm relaxed waiting
+    drawStick(figX, figFacing, relaxedJoints(scene.height));
+
+  } else if (animState === 'push') {
+    // Phase 1: hand placed at the right edge of the wheel (3 o'clock position)
+    const wi = getWheelInfo();
+    const sceneHX = wi.cx + wi.r - 6;      // slightly inside rim so hand visually touches
+    const sceneHY = wi.cy;                  // vertical center of wheel
+    const loc = rimToLocal(sceneHX, sceneHY, figX, figFacing);
+    drawStick(figX, figFacing, standJoints(scene.height, loc.lx, loc.ly));
+
+  } else if (animState === 'spinning') {
+    // Wheel spinning fast — figure stands back, arm relaxed, watching
+    drawStick(figX, figFacing, relaxedJoints(scene.height));
+
+  } else if (animState === 'touch-before-turn') {
+    // Hand briefly on right edge of wheel before turning to walk out
+    const wi = getWheelInfo();
+    const sceneHX = wi.cx + wi.r - 6;
+    const sceneHY = wi.cy;
+    const loc = rimToLocal(sceneHX, sceneHY, figX, figFacing);
+    drawStick(figX, figFacing, standJoints(scene.height, loc.lx, loc.ly));
+
+  } else if (animState === 'walking-out') {
+    figFacing = 1;
+    figX += 130 * dt;
+    walkCycle += dt * 1.4;
+    drawStick(figX, figFacing, walkJoints(walkCycle, scene.height));
+    if (figX > scene.width + 100) {
+      animState = 'idle'; scene.style.display = 'none'; prevTS = null; return;
+    }
+  }
+
+  animRAF = requestAnimationFrame(animLoop);
+}
+
+// ---- WHEEL + FIGURE SYNC ----
 const btn = document.getElementById('spin-btn');
+const resultBox = document.getElementById('result-box');
 function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
 
 btn.addEventListener('click', () => {
   btn.disabled = true;
+  resultBox.style.display = 'none';
+  resultBox.textContent = '';
 
-  // WIN: segment 0 must be under the arrow (pointing straight down = -PI/2)
-  // Arrow points to top = angle offset = -PI/2
-  // Segment 0 center is at currentAngle + 0*sliceAngle + sliceAngle/2
-  // We want: currentAngle + sliceAngle/2 = -PI/2 (mod 2PI)
-  // So: targetAngle = -PI/2 - sliceAngle/2 (mod 2PI)
+  resizeScene();
+  const wi = getWheelInfo();
+  scene.style.display = 'block';
+
+  figX = scene.width + 60;
+  figFacing = -1;
+  walkCycle = 0;
+  targetX = getStopX(wi);
+  animState = 'walking-in';
+  prevTS = null;
+  if (animRAF) cancelAnimationFrame(animRAF);
+  animRAF = requestAnimationFrame(animLoop);
 
   const winAngle = -Math.PI / 2 - sliceAngle / 2;
   const extraSpins = 2 * Math.PI * (7 + Math.floor(Math.random() * 3));
-  // Calculate how much to rotate forward to land on winAngle
-  const delta = ((winAngle - currentAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  const delta = ((winAngle - currentAngle) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
   const totalForward = extraSpins + delta;
-
-  const phase1Duration = 2000;
-  const phase1Delta = -(20 * Math.PI / 180);
-  let phase1Start = null;
   const startAngle = currentAngle;
 
-  function phase1(ts) {
-    if (!phase1Start) phase1Start = ts;
-    const t = Math.min((ts - phase1Start) / phase1Duration, 1);
-    const eased = Math.sin(t * Math.PI / 2);
-    const newAngle = startAngle + phase1Delta * eased;
-    checkBumps(currentAngle, newAngle);
-    currentAngle = newAngle;
-    drawWheel(currentAngle);
-    if (t < 1) requestAnimationFrame(phase1);
-    else requestAnimationFrame(phase2);
-  }
+  // Walk-in duration: distance / speed
+  const walkDist = figX - targetX;
+  const walkInMs = (walkDist / 130) * 1000;
 
-  const phase2Duration = 10000;
-  let phase2Start = null;
-  let phase2StartAngle;
-  let phase2EndAngle;
+  setTimeout(() => {
+    // Phase 1: slow backward push (~20° back over 2s) — figure touches wheel
+    animState = 'push';
+    let p1Start = null;
+    let prevAngleP1 = currentAngle;
 
-  function phase2(ts) {
-    if (!phase2Start) {
-      phase2Start = ts;
-      phase2StartAngle = currentAngle;
-      phase2EndAngle = phase2StartAngle + totalForward;
-    }
-    const t = Math.min((ts - phase2Start) / phase2Duration, 1);
-    const eased = easeOut(t);
-    const newAngle = phase2StartAngle + (phase2EndAngle - phase2StartAngle) * eased;
-    checkBumps(currentAngle, newAngle);
-    currentAngle = newAngle;
-    drawWheel(currentAngle);
-    if (t < 1) requestAnimationFrame(phase2);
-    else {
-      currentAngle = phase2EndAngle;
+    function phase1(ts) {
+      if (!p1Start) p1Start = ts;
+      const t = Math.min((ts - p1Start) / 2000, 1);
+      const newAngle = startAngle + (-(20*Math.PI/180)) * Math.sin(t * Math.PI / 2);
+      currentWheelVel = (newAngle - prevAngleP1) / (1/60);
+      prevAngleP1 = newAngle;
+      checkBumps(currentAngle, newAngle);
+      currentAngle = newAngle;
       drawWheel(currentAngle);
-      setTimeout(launchFireworks, 400);
-      setTimeout(() => { btn.disabled = false; }, 6000);
+      if (t < 1) requestAnimationFrame(phase1); else requestAnimationFrame(phase2);
     }
-  }
 
-  requestAnimationFrame(phase1);
+    let p2Start = null, p2StartAngle, p2EndAngle, prevAngleP2;
+    let touchTriggered = false;
+    function phase2(ts) {
+      if (!p2Start) { p2Start = ts; p2StartAngle = currentAngle; p2EndAngle = p2StartAngle + totalForward; prevAngleP2 = currentAngle; touchTriggered = false; }
+      const tRaw = (ts - p2Start) / 10000;
+      const t = Math.min(tRaw, 1);
+      const newAngle = p2StartAngle + (p2EndAngle - p2StartAngle) * easeOut(t);
+      currentWheelVel = (newAngle - prevAngleP2) / (1/60);
+      prevAngleP2 = newAngle;
+
+      // Always relaxed/watching during spin — no hand on wheel
+      if (animState !== 'touch-before-turn') {
+        animState = 'spinning';
+      }
+
+      // Trigger brief touch once when wheel is nearly stopped (t >= 0.88)
+      if (!touchTriggered && t >= 0.88) {
+        touchTriggered = true;
+        animState = 'touch-before-turn';
+      }
+
+      checkBumps(currentAngle, newAngle);
+      currentAngle = newAngle;
+      drawWheel(currentAngle);
+
+      if (t < 1) {
+        requestAnimationFrame(phase2);
+      } else {
+        currentAngle = p2EndAngle;
+        drawWheel(currentAngle);
+        currentWheelVel = 0;
+        animState = 'touch-before-turn';
+        const winner = getWinningSegment(currentAngle);
+        setTimeout(() => { launchFireworks(); resultBox.textContent = '🎉 Gewonnen: ' + winner; resultBox.style.display = 'block'; }, 400);
+        setTimeout(() => { animState = 'walking-out'; walkCycle = 0; }, 700);
+        setTimeout(() => { btn.disabled = false; }, 6000);
+      }
+    }
+
+    requestAnimationFrame(phase1);
+  }, walkInMs);
 });
 
-// === FIREWORKS ===
+// ---- FIREWORKS ----
 const fwCanvas = document.getElementById('fireworks');
 const fwCtx = fwCanvas.getContext('2d');
-let particles = [];
-let fwAnim = null;
-
+let particles = [], fwAnim = null;
 function spawnBurst(x, y, hue, count) {
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * 2 * Math.PI + Math.random() * 0.3;
-    const speed = 3 + Math.random() * 6;
-    const size = 2 + Math.random() * 3;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      alpha: 1,
-      size,
-      color: `hsl(${hue + Math.random()*40 - 20},100%,60%)`,
-      trail: []
-    });
+    const angle = (i/count)*2*Math.PI + Math.random()*0.3, speed = 3+Math.random()*6;
+    particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,alpha:1,size:2+Math.random()*3,color:`hsl(${hue+Math.random()*40-20},100%,60%)`,trail:[]});
   }
 }
-
-function spawnRocket(targetX, targetY, hue) {
-  return new Promise(resolve => {
-    const startX = targetX + (Math.random() - 0.5) * 100;
-    const startY = fwCanvas.height;
-    const duration = 600 + Math.random() * 400;
-    const start = performance.now();
-    function rise(ts) {
-      const t = Math.min((ts - start) / duration, 1);
-      const cx = startX + (targetX - startX) * t;
-      const cy = startY + (targetY - startY) * t;
-      fwCtx.beginPath();
-      fwCtx.arc(cx, cy, 3, 0, 2 * Math.PI);
-      fwCtx.fillStyle = `hsl(${hue},100%,80%)`;
-      fwCtx.globalAlpha = 1;
-      fwCtx.fill();
-      fwCtx.globalAlpha = 1;
-      if (t < 1) requestAnimationFrame(rise);
-      else { spawnBurst(targetX, targetY, hue, 55); resolve(); }
-    }
-    requestAnimationFrame(rise);
-  });
-}
-
-function launchFireworks() {
-  fwCanvas.style.display = 'block';
-  fwCanvas.width = window.innerWidth;
-  fwCanvas.height = window.innerHeight;
-  particles = [];
-
-  const hues = [0, 40, 60, 120, 200, 270, 300, 180];
-  let launched = 0;
-
-  async function wave() {
-    const count = 3 + Math.floor(Math.random() * 3);
-    const promises = [];
-    for (let i = 0; i < count; i++) {
-      const x = fwCanvas.width * (0.15 + Math.random() * 0.7);
-      const y = fwCanvas.height * (0.08 + Math.random() * 0.45);
-      const hue = hues[Math.floor(Math.random() * hues.length)];
-      promises.push(spawnRocket(x, y, hue));
-    }
-    await Promise.all(promises);
-    launched++;
-    if (launched < 5) setTimeout(wave, 300);
-    else {
-      setTimeout(() => {
-        fwCanvas.style.display = 'none';
-        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
-        particles = [];
-      }, 2500);
-    }
-  }
-
-  wave();
-
-  if (fwAnim) cancelAnimationFrame(fwAnim);
-  function animateFW(ts) {
-    fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
-    particles = particles.filter(p => p.alpha > 0.02);
-    particles.forEach(p => {
-      p.trail.push({x: p.x, y: p.y, alpha: p.alpha});
-      if (p.trail.length > 8) p.trail.shift();
-      p.trail.forEach((pt, i) => {
-        fwCtx.beginPath();
-        fwCtx.arc(pt.x, pt.y, p.size * (i / p.trail.length), 0, 2 * Math.PI);
-        fwCtx.fillStyle = p.color;
-        fwCtx.globalAlpha = pt.alpha * (i / p.trail.length) * 0.5;
-        fwCtx.fill();
-      });
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.12;
-      p.vx *= 0.98;
-      p.alpha -= 0.013;
-      fwCtx.beginPath();
-      fwCtx.arc(p.x, p.y, p.size, 0, 2 * Math.PI);
-      fwCtx.fillStyle = p.color;
-      fwCtx.globalAlpha = Math.max(p.alpha, 0);
-      fwCtx.fill();
-      fwCtx.globalAlpha = 1;
-    });
-    fwAnim = requestAnimationFrame(animateFW);
-  }
-  fwAnim = requestAnimationFrame(animateFW);
-}
+function spawnRocket(tx,ty,hue){return new Promise(resolve=>{const sx=tx+(Math.random()-.5)*100,sy=fwCanvas.height,dur=600+Math.random()*400,t0=performance.now();function rise(ts){const t=Math.min((ts-t0)/dur,1);fwCtx.beginPath();fwCtx.arc(sx+(tx-sx)*t,sy+(ty-sy)*t,3,0,2*Math.PI);fwCtx.fillStyle=`hsl(${hue},100%,80%)`;fwCtx.globalAlpha=1;fwCtx.fill();if(t<1)requestAnimationFrame(rise);else{spawnBurst(tx,ty,hue,55);resolve();}}requestAnimationFrame(rise);})}
+function launchFireworks(){fwCanvas.width=window.innerWidth;fwCanvas.height=window.innerHeight;fwCanvas.style.display='block';particles=[];const hues=[0,40,60,120,200,270,300,180];let launched=0;async function wave(){const cnt=3+Math.floor(Math.random()*3);await Promise.all(Array.from({length:cnt},()=>spawnRocket(fwCanvas.width*(.15+Math.random()*.7),fwCanvas.height*(.08+Math.random()*.45),hues[Math.floor(Math.random()*hues.length)])));if(++launched<5)setTimeout(wave,300);else setTimeout(()=>{fwCanvas.style.display='none';fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);particles=[];},2500);}wave();if(fwAnim)cancelAnimationFrame(fwAnim);function animFW(){fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);particles=particles.filter(p=>p.alpha>.02);particles.forEach(p=>{p.trail.push({x:p.x,y:p.y,alpha:p.alpha});if(p.trail.length>8)p.trail.shift();p.trail.forEach((pt,i)=>{fwCtx.beginPath();fwCtx.arc(pt.x,pt.y,p.size*(i/p.trail.length),0,2*Math.PI);fwCtx.fillStyle=p.color;fwCtx.globalAlpha=pt.alpha*(i/p.trail.length)*.5;fwCtx.fill();});p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.vx*=.98;p.alpha-=.013;fwCtx.beginPath();fwCtx.arc(p.x,p.y,p.size,0,2*Math.PI);fwCtx.fillStyle=p.color;fwCtx.globalAlpha=Math.max(p.alpha,0);fwCtx.fill();fwCtx.globalAlpha=1;});fwAnim=requestAnimationFrame(animFW);}fwAnim=requestAnimationFrame(animFW);}
 </script>
